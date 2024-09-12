@@ -134,6 +134,15 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                         output_inverts = np.array([train_data.scaler.inverse_transform(output.detach().cpu().numpy()) for output in outputs])
                         batch_y_inverts = np.array([train_data.scaler.inverse_transform(b_y.detach().cpu().numpy()) for b_y in batch_y])
 
+                        output_inverts_tensor = torch.tensor(output_inverts, requires_grad=True).float().to(self.device)
+                        batch_y_inverts_tensor = torch.tensor(batch_y_inverts, requires_grad=True).float().to(self.device)
+
+                        # Compute the element-wise absolute difference using PyTorch
+                        difference_tensor = torch.abs(output_inverts_tensor - batch_y_inverts_tensor)
+
+                        # Mean Absolute Error (MAE) in PyTorch
+                        mae_loss_tensor = torch.mean(difference_tensor)
+
                         # Compute loss based on the output columns
                         loss = criterion(outputs, batch_y)
                         train_loss.append(loss.item())
@@ -154,20 +163,14 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                     
                     difference = np.abs(output_inverts - batch_y_inverts)
                     
-                    output_inverts_tensor = torch.tensor(output_inverts).float().to(self.device)
-                    batch_y_inverts_tensor = torch.tensor(batch_y_inverts).float().to(self.device)
+                    output_inverts_tensor = torch.tensor(output_inverts, requires_grad=True).float().to(self.device)
+                    batch_y_inverts_tensor = torch.tensor(batch_y_inverts, requires_grad=True).float().to(self.device)
+
                     # Compute the element-wise absolute difference using PyTorch
                     difference_tensor = torch.abs(output_inverts_tensor - batch_y_inverts_tensor)
 
                     # Mean Absolute Error (MAE) in PyTorch
                     mae_loss_tensor = torch.mean(difference_tensor)
-
-                    # Mean Squared Error (MSE) in PyTorch
-                    squared_difference_tensor = (output_inverts_tensor - batch_y_inverts_tensor) ** 2
-                    mse_loss_tensor = torch.mean(squared_difference_tensor)
-
-                    # Root Mean Squared Error (RMSE) in PyTorch
-                    rmse_loss_tensor = torch.sqrt(mse_loss_tensor)
 
                     # Compute loss based on the output columns
                     loss = criterion(outputs, batch_y)
@@ -182,13 +185,13 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                     time_now = time.time()
 
                 if self.args.use_amp:
-                    scaler.scale(loss).backward()
-                    # scaler.scale(mse_loss_tensor).backward()
+                    # scaler.scale(loss).backward()
+                    scaler.scale(mae_loss_tensor).backward()
                     scaler.step(model_optim)
                     scaler.update()
                 else:
-                    loss.backward()
-                    # mse_loss_tensor.backward()
+                    # loss.backward()
+                    mae_loss_tensor.backward()
                     model_optim.step()
 
             print("Epoch: {} cost time: {}".format(epoch + 1, time.time() - epoch_time))
