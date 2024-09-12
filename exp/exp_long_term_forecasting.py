@@ -185,13 +185,13 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                     time_now = time.time()
 
                 if self.args.use_amp:
-                    # scaler.scale(loss).backward()
-                    scaler.scale(mae_loss_tensor).backward()
+                    scaler.scale(loss).backward()
+                    # scaler.scale(mae_loss_tensor).backward()
                     scaler.step(model_optim)
                     scaler.update()
                 else:
-                    # loss.backward()
-                    mae_loss_tensor.backward()
+                    loss.backward()
+                    # mae_loss_tensor.backward()
                     model_optim.step()
 
             print("Epoch: {} cost time: {}".format(epoch + 1, time.time() - epoch_time))
