@@ -85,17 +85,13 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         vali_data, vali_loader = self._get_data(flag='val')
         test_data, test_loader = self._get_data(flag='test')
 
-
-
         path = os.path.join(self.args.checkpoints, setting)
         if not os.path.exists(path):
             os.makedirs(path)
 
         time_now = time.time()
-
         train_steps = len(train_loader)
         early_stopping = EarlyStopping(patience=self.args.patience, verbose=True)
-
         model_optim = self._select_optimizer()
         criterion = self._select_criterion()
 
@@ -113,7 +109,6 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                 model_optim.zero_grad()
 
                 batch_x = batch_x.float().to(self.device)
-
                 batch_y = batch_y.float().to(self.device)
                 batch_x_mark = batch_x_mark.float().to(self.device)
                 batch_y_mark = batch_y_mark.float().to(self.device)
@@ -130,9 +125,16 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                         else:
                             outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
 
+                        # Ensure model returns the relevant columns (Open, High, Low, Close, Volume)
                         f_dim = -1 if self.args.features == 'MS' else 0
                         outputs = outputs[:, -self.args.pred_len:, f_dim:]
                         batch_y = batch_y[:, -self.args.pred_len:, f_dim:].to(self.device)
+
+                        #invert scale
+                        output_inverts = np.array([train_data.scaler.inverse_transform(output.detach().cpu().numpy()) for output in outputs])
+                        batch_y_inverts = np.array([train_data.scaler.inverse_transform(b_y.detach().cpu().numpy()) for b_y in batch_y])
+
+                        # Compute loss based on the output columns
                         loss = criterion(outputs, batch_y)
                         train_loss.append(loss.item())
                 else:
@@ -141,9 +143,33 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                     else:
                         outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
 
+                    # Ensure model returns the relevant columns (Open, High, Low, Close, Volume)
                     f_dim = -1 if self.args.features == 'MS' else 0
                     outputs = outputs[:, -self.args.pred_len:, f_dim:]
                     batch_y = batch_y[:, -self.args.pred_len:, f_dim:].to(self.device)
+
+                    #invert scale
+                    output_inverts = np.array([train_data.scaler.inverse_transform(output.detach().cpu().numpy()) for output in outputs])
+                    batch_y_inverts = np.array([train_data.scaler.inverse_transform(b_y.detach().cpu().numpy()) for b_y in batch_y])
+                    
+                    difference = np.abs(output_inverts - batch_y_inverts)
+                    
+                    output_inverts_tensor = torch.tensor(output_inverts).float().to(self.device)
+                    batch_y_inverts_tensor = torch.tensor(batch_y_inverts).float().to(self.device)
+                    # Compute the element-wise absolute difference using PyTorch
+                    difference_tensor = torch.abs(output_inverts_tensor - batch_y_inverts_tensor)
+
+                    # Mean Absolute Error (MAE) in PyTorch
+                    mae_loss_tensor = torch.mean(difference_tensor)
+
+                    # Mean Squared Error (MSE) in PyTorch
+                    squared_difference_tensor = (output_inverts_tensor - batch_y_inverts_tensor) ** 2
+                    mse_loss_tensor = torch.mean(squared_difference_tensor)
+
+                    # Root Mean Squared Error (RMSE) in PyTorch
+                    rmse_loss_tensor = torch.sqrt(mse_loss_tensor)
+
+                    # Compute loss based on the output columns
                     loss = criterion(outputs, batch_y)
                     train_loss.append(loss.item())
 
@@ -156,11 +182,13 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                     time_now = time.time()
 
                 if self.args.use_amp:
-                    scaler.scale(loss).backward()
+                    # scaler.scale(loss).backward()
+                    scaler.scale(mse_loss_tensor).backward()
                     scaler.step(model_optim)
                     scaler.update()
                 else:
-                    loss.backward()
+                    # loss.backward()
+                    mse_loss_tensor.backward()
                     model_optim.step()
 
             print("Epoch: {} cost time: {}".format(epoch + 1, time.time() - epoch_time))
@@ -168,8 +196,8 @@ class Exp_Long_Term_Forecast(Exp_Basic):
             vali_loss = self.vali(vali_data, vali_loader, criterion)
             test_loss = self.vali(test_data, test_loader, criterion)
 
-            print("Epoch: {0}, Steps: {1} | Train Loss: {2:.7f} Vali Loss: {3:.7f} Test Loss: {4:.7f}".format(
-                epoch + 1, train_steps, train_loss, vali_loss, test_loss))
+            print("Epoch: {0}, Steps: {1} | Train Loss: {2:.7f} Vali Loss: {3:.7f} Test Loss: {4:.7f} RMSE Loss: {5:.7f}".format(
+                epoch + 1, train_steps, train_loss, vali_loss, test_loss, rmse_loss_tensor.item()))
             early_stopping(vali_loss, self.model, path)
             if early_stopping.early_stop:
                 print("Early stopping")
@@ -181,6 +209,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         self.model.load_state_dict(torch.load(best_model_path))
 
         return self.model
+
 
     def test(self, setting, test=0):
         test_data, test_loader = self._get_data(flag='test')

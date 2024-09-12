@@ -59,11 +59,8 @@ class Dataset_Custom(Dataset):
         border1 = border1s[self.set_type]
         border2 = border2s[self.set_type]
 
-        if self.features == 'M' or self.features == 'MS':
-            cols_data = df_raw.columns[1:]
-            df_data = df_raw[cols_data]
-        elif self.features == 'S':
-            df_data = df_raw[[self.target]]
+        cols_data = df_raw.columns[1:]
+        df_data = df_raw[cols_data]
 
         if self.scale:
             train_data = df_data[border1s[0]:border2s[0]]
@@ -75,11 +72,11 @@ class Dataset_Custom(Dataset):
         df_stamp = df_raw[['Date']][border1:border2]
         df_stamp['Date'] = pd.to_datetime(df_stamp.Date)
         if self.timeenc == 0:
-            df_stamp['onth'] = df_stamp.date.apply(lambda row: row.month, 1)
+            df_stamp['month'] = df_stamp.date.apply(lambda row: row.month, 1)
             df_stamp['day'] = df_stamp.date.apply(lambda row: row.day, 1)
             df_stamp['weekday'] = df_stamp.date.apply(lambda row: row.weekday(), 1)
             df_stamp['hour'] = df_stamp.date.apply(lambda row: row.hour, 1)
-            data_stamp = df_stamp.drop(['date'], 1).values
+            data_stamp = df_stamp.drop(['Date'], 1).values
         elif self.timeenc == 1:
             data_stamp = time_features(pd.to_datetime(df_stamp['Date'].values), freq=self.freq)
             data_stamp = data_stamp.transpose(1, 0)
