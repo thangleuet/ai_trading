@@ -36,7 +36,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         criterion = nn.MSELoss()
         return criterion
 
-    def vali(self, vali_data, vali_loader, criterion):
+    def vali(self, vali_data, vali_loader, criterion, epoch=0):
         total_loss = []
         self.model.eval()
         with torch.no_grad():
@@ -77,7 +77,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                     true = np.array([vali_data.inverse_transform(b_y.detach().cpu().numpy()) for b_y in batch_y])
 
                 pred = outputs
-                folder_result = 'test_results'
+                folder_result = f'test_results + {epoch}'
 
                 if not os.path.exists(folder_result):
                     os.makedirs(folder_result)
@@ -179,7 +179,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
 
             print("Epoch: {} cost time: {}".format(epoch + 1, time.time() - epoch_time))
             train_loss = np.average(train_loss)
-            vali_loss = self.vali(vali_data, vali_loader, criterion)
+            vali_loss = self.vali(vali_data, vali_loader, criterion, epoch + 1)
             # test_loss = self.vali(test_data, test_loader, criterion)
 
             print("Epoch: {0}, Steps: {1} | Train Loss: {2:.7f} Vali Loss: {3:.7f}".format(
