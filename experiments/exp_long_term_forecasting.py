@@ -77,7 +77,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                     true = np.array([vali_data.inverse_transform(b_y.detach().cpu().numpy()) for b_y in batch_y])
 
                 pred = outputs
-                folder_result = f'test_results + {epoch}'
+                folder_result = f'test_results/{epoch}'
 
                 if not os.path.exists(folder_result):
                     os.makedirs(folder_result)
