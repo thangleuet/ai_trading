@@ -133,7 +133,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                     name_image = f"{i}_{round(true_max_idx - pd_max_idx, 2)}_{round(true_min_idx - pd_min_idx, 2)}_{round(mae, 2)}"
                     visual(gt, pd, true_max_idx, true_min_idx, pd_max_idx, pd_min_idx, os.path.join(folder_result, name_image + '.png'))
 
-                total_loss.append(loss)
+                total_loss.append(loss.item())
         total_loss = np.average(total_loss)
         self.model.train()
         return total_loss
