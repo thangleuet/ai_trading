@@ -1,4 +1,6 @@
+import pandas as pd
 from data_provider.data_factory import data_provider
+from data_provider.data_loader import Dataset_Custom
 from experiments.exp_basic import Exp_Basic
 from utils.tools import EarlyStopping, adjust_learning_rate, visual
 from utils.metrics import metric
@@ -9,6 +11,8 @@ import os
 import time
 import warnings
 import numpy as np
+import tqdm
+from torch.utils.data import DataLoader
 
 warnings.filterwarnings('ignore')
 
@@ -25,8 +29,31 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         return model
 
     def _get_data(self, flag):
-        data_set, data_loader = data_provider(self.args, flag)
-        return data_set, data_loader
+        # data_set, data_loader = data_provider(self.args, flag)
+        # return data_set, data_loader
+
+        if flag == 'train':
+            csv_files = [f for f in os.listdir('train') if f.endswith('.csv')]
+            df_raw = pd.concat([pd.read_csv(os.path.join('train', f)) for f in csv_files], axis=0)
+            # remove 200 elements first in df_raw
+            df_raw = df_raw.iloc[200: , :]
+            data = Dataset_Custom(df_raw=df_raw, size=[self.args.seq_len, self.args.label_len, self.args.pred_len])
+            data_loader = DataLoader(
+                data,
+                batch_size=self.args.batch_size,
+                shuffle=42)
+            
+        elif flag == 'val':
+            csv_files = [f for f in os.listdir('test') if f.endswith('.csv')]
+            df_raw = pd.concat([pd.read_csv(os.path.join('test', f)) for f in csv_files], axis=0)
+            
+            data = Dataset_Custom(df_raw=df_raw, size=[self.args.seq_len, self.args.label_len, self.args.pred_len])
+            data_loader = DataLoader(
+                data,
+                batch_size=self.args.batch_size,
+                shuffle=42)
+            
+        return data, data_loader
 
     def _select_optimizer(self):
         model_optim = optim.Adam(self.model.parameters(), lr=self.args.learning_rate)
@@ -36,19 +63,16 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         criterion = nn.MSELoss()
         return criterion
 
-    def vali(self, vali_data, vali_loader, criterion, epoch=0):
+    def vali(self, train_data, vali_loader, criterion, epoch=0):
         total_loss = []
         self.model.eval()
         with torch.no_grad():
-            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(vali_loader):
+            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in tqdm.tqdm(enumerate(vali_loader)):
                 batch_x = batch_x.float().to(self.device)
                 batch_y = batch_y.float().to(self.device)
-                if 'PEMS' in self.args.data or 'Solar' in self.args.data:
-                    batch_x_mark = None
-                    batch_y_mark = None
-                else:
-                    batch_x_mark = batch_x_mark.float().to(self.device)
-                    batch_y_mark = batch_y_mark.float().to(self.device)
+            
+                batch_x_mark = batch_x_mark.float().to(self.device)
+                batch_y_mark = batch_y_mark.float().to(self.device)
 
                 # decoder input
                 dec_inp = torch.zeros_like(batch_y[:, -self.args.pred_len:, :]).float()
@@ -71,10 +95,14 @@ class Exp_Long_Term_Forecast(Exp_Basic):
 
                 loss = criterion(outputs, batch_y)
 
-                if vali_data.scale:
+                if train_data.scale:
                     shape = outputs.shape
-                    outputs = np.array([vali_data.inverse_transform(output.detach().cpu().numpy()) for output in outputs])
-                    true = np.array([vali_data.inverse_transform(b_y.detach().cpu().numpy()) for b_y in batch_y])
+                    outputs = np.array([train_data.inverse_transform(output.detach().cpu().numpy()) for output in outputs])
+                    true = np.array([train_data.inverse_transform(b_y.detach().cpu().numpy()) for b_y in batch_y])
+                else:
+                    shape = outputs.shape
+                    outputs = np.array([output.detach().cpu().numpy() for output in outputs])
+                    true = np.array([b_y.detach().cpu().numpy() for b_y in batch_y])
 
                 pred = outputs
                 folder_result = f'test_results/{epoch}'
@@ -84,10 +112,26 @@ class Exp_Long_Term_Forecast(Exp_Basic):
 
                 if i % 1 == 0:
                     # input = batch_x.detach().cpu().numpy()
-                    input = np.array([vali_data.inverse_transform(b_x.detach().cpu().numpy()) for b_x in batch_x])
+                    if train_data.scale:
+                        input = np.array([train_data.inverse_transform(b_x.detach().cpu().numpy()) for b_x in batch_x])
+                    else:
+                        input = np.array([b_x.detach().cpu().numpy() for b_x in batch_x])
                     gt = np.concatenate((input[0, :, -1], true[0, :, -1]), axis=0)
                     pd = np.concatenate((input[0, :, -1], pred[0, :, -1]), axis=0)
-                    visual(gt, pd, os.path.join(folder_result, str(i) + '.png'))
+
+                    true_max_idx = np.argmax(true[0, :, -1]) + input[0, :, -1].shape[0]
+                    true_min_idx = np.argmin(true[0, :, -1]) + input[0, :, -1].shape[0]
+
+                    pd_max_idx = np.argmax(pred[0, :, -1]) + input[0, :, -1].shape[0]
+                    pd_min_idx = np.argmin(pred[0, :, -1]) + input[0, :, -1].shape[0]
+
+                    mae = np.mean(np.abs(pred[0, :, -1] - true[0, :, -1]))
+
+                    diff_x_true = np.concatenate((input[0, :, -2], true[0, :, -2]), axis=0)
+                    diff_x_pred = np.concatenate((input[0, :, -2], pred[0, :, -2]), axis=0)
+
+                    name_image = f"{i}_{round(true_max_idx - pd_max_idx, 2)}_{round(true_min_idx - pd_min_idx, 2)}_{round(mae, 2)}"
+                    visual(gt, pd, true_max_idx, true_min_idx, pd_max_idx, pd_min_idx, os.path.join(folder_result, name_image + '.png'))
 
                 total_loss.append(loss)
         total_loss = np.average(total_loss)
@@ -97,9 +141,8 @@ class Exp_Long_Term_Forecast(Exp_Basic):
     def train(self, setting):
         train_data, train_loader = self._get_data(flag='train')
         vali_data, vali_loader = self._get_data(flag='val')
-        test_data, test_loader = self._get_data(flag='test')
 
-        path = os.path.join(self.args.checkpoints, setting)
+        path = "checkpoints" 
         if not os.path.exists(path):
             os.makedirs(path)
 
@@ -120,7 +163,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
 
             self.model.train()
             epoch_time = time.time()
-            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(train_loader):
+            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in tqdm.tqdm(enumerate(train_loader)):
                 iter_count += 1
                 model_optim.zero_grad()
                 batch_x = batch_x.float().to(self.device)
@@ -179,7 +222,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
 
             print("Epoch: {} cost time: {}".format(epoch + 1, time.time() - epoch_time))
             train_loss = np.average(train_loss)
-            vali_loss = self.vali(vali_data, vali_loader, criterion, epoch + 1)
+            vali_loss = self.vali(train_data, vali_loader, criterion, epoch + 1)
             # test_loss = self.vali(test_data, test_loader, criterion)
 
             print("Epoch: {0}, Steps: {1} | Train Loss: {2:.7f} Vali Loss: {3:.7f}".format(
@@ -194,8 +237,8 @@ class Exp_Long_Term_Forecast(Exp_Basic):
 
             # get_cka(self.args, setting, self.model, train_loader, self.device, epoch)
 
-        best_model_path = path + '/' + 'checkpoint.pth'
-        self.model.load_state_dict(torch.load(best_model_path))
+        # best_model_path = path + '/' + 'checkpoint.pth'
+        # self.model.load_state_dict(torch.load(best_model_path))
 
         return self.model
 

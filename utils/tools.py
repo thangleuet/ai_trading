@@ -75,14 +75,23 @@ class StandardScaler():
         return (data * self.std) + self.mean
 
 
-def visual(true, preds=None, name='./pic/test.pdf'):
+def visual(true, preds, true_max_idx, true_min_idx, preds_max_idx, preds_min_idx, name='./pic/test.pdf'):
     """
     Results visualization
     """
     plt.figure()
     plt.plot(true, label='GroundTruth', linewidth=2)
+
+    plt.scatter(true_max_idx, true[true_max_idx], color='red', label='True Max', zorder=5)
+    plt.scatter(true_min_idx, true[true_min_idx], color='blue', label='True Min', zorder=5)
+    plt.text(true_max_idx, true[true_max_idx], str(true[true_max_idx]), fontsize=10)
+    plt.text(true_min_idx, true[true_min_idx], str(true[true_min_idx]), fontsize=10)
     if preds is not None:
         plt.plot(preds, label='Prediction', linewidth=2)
+        plt.scatter(preds_max_idx, preds[preds_max_idx], color='orange', label='Pred Max', zorder=5)
+        plt.scatter(preds_min_idx, preds[preds_min_idx], color='green', label='Pred Min', zorder=5)
+        plt.text(preds_max_idx, preds[preds_max_idx], str(preds[preds_max_idx]), fontsize=10)
+        plt.text(preds_min_idx, preds[preds_min_idx], str(preds[preds_min_idx]), fontsize=10)
     plt.legend()
     plt.savefig(name, bbox_inches='tight')
 
