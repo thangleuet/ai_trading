@@ -75,23 +75,48 @@ class StandardScaler():
         return (data * self.std) + self.mean
 
 
-def visual(true, preds, true_max_idx, true_min_idx, preds_max_idx, preds_min_idx, name='./pic/test.pdf'):
+def visual(true, preds, actual = None, x_zigzag_data_true = None, y_zigzag_data_true = None, x_zigzag_data_pred = None, y_zigzag_data_pred = None, seg_len = None,  name='./pic/test.pdf'):
     """
     Results visualization
     """
-    plt.figure()
+    plt.figure(figsize=(20, 5))
     plt.plot(true, label='GroundTruth', linewidth=2)
+    if actual is not None:
+        plt.plot(actual, label='Actual', linewidth=3)
+    
+    if seg_len is not None and y_zigzag_data_true is not None:
+        y_seg = [min(y_zigzag_data_true), max(y_zigzag_data_true)]
+        plt.plot([seg_len, seg_len], y_seg, label='current', linewidth=2)
+    
+    if x_zigzag_data_true is not None and y_zigzag_data_true is not None:
+        plt.plot(x_zigzag_data_true, y_zigzag_data_true, label='ZigZag True', linewidth=2)
+    if x_zigzag_data_pred is not None and y_zigzag_data_pred is not None:
+        plt.plot(x_zigzag_data_pred, y_zigzag_data_pred, label='ZigZag Pred', linewidth=2, linestyle='--')
 
-    plt.scatter(true_max_idx, true[true_max_idx], color='red', label='True Max', zorder=5)
-    plt.scatter(true_min_idx, true[true_min_idx], color='blue', label='True Min', zorder=5)
-    plt.text(true_max_idx, true[true_max_idx], str(true[true_max_idx]), fontsize=10)
-    plt.text(true_min_idx, true[true_min_idx], str(true[true_min_idx]), fontsize=10)
+    # Plot HL1, HL2
+    number_HL_true = 0
+    if x_zigzag_data_true is not None:
+        for i, x in enumerate(x_zigzag_data_true):
+            if x > seg_len:
+                number_HL_true += 1
+                plt.scatter(x_zigzag_data_true[i], y_zigzag_data_true[i], s=50, c='red', marker='o')
+                price = str(round(y_zigzag_data_true[i], 2))
+                plt.text(x_zigzag_data_true[i], y_zigzag_data_true[i], f"HL{number_HL_true}_{price}", fontsize=12)
+            if number_HL_true == 2:
+                break
+    number_HL_pred = 0
+    if x_zigzag_data_pred is not None:
+        for i, x in enumerate(x_zigzag_data_pred):
+            if x > seg_len:
+                number_HL_pred += 1
+                plt.scatter(x_zigzag_data_pred[i], y_zigzag_data_pred[i], s=50, c='red', marker='o')
+                price = str(round(y_zigzag_data_pred[i], 2))
+                plt.text(x_zigzag_data_pred[i], y_zigzag_data_pred[i], f"HL{number_HL_pred}_{price}", fontsize=12)
+            if number_HL_pred == 2:
+                break
+
     if preds is not None:
         plt.plot(preds, label='Prediction', linewidth=2)
-        plt.scatter(preds_max_idx, preds[preds_max_idx], color='orange', label='Pred Max', zorder=5)
-        plt.scatter(preds_min_idx, preds[preds_min_idx], color='green', label='Pred Min', zorder=5)
-        plt.text(preds_max_idx, preds[preds_max_idx], str(preds[preds_max_idx]), fontsize=10)
-        plt.text(preds_min_idx, preds[preds_min_idx], str(preds[preds_min_idx]), fontsize=10)
     plt.legend()
     plt.savefig(name, bbox_inches='tight')
 

@@ -41,7 +41,7 @@ class Dataset_Custom(Dataset):
         df_raw.columns: ['date', ...(other features), target feature]
         '''
         cols = list(self.df_raw.columns)
-        cols = ['Open', 'High', 'Low', 'volume', 'Close']
+        cols = ['Open', 'High', 'Low','volume', 'Close']
         self.df_raw = self.df_raw[['Date'] + cols]
        
         cols_data = self.df_raw.columns[1:]
