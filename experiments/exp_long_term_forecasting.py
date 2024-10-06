@@ -225,7 +225,6 @@ class Exp_Long_Term_Forecast(Exp_Basic):
             print("Epoch: {} cost time: {}".format(epoch + 1, time.time() - epoch_time))
             train_loss = np.average(train_loss)
             vali_loss = self.vali(train_data, vali_loader, criterion, epoch + 1)
-            # test_loss = self.vali(test_data, test_loader, criterion)
 
             print("Epoch: {0}, Steps: {1} | Train Loss: {2:.7f} Vali Loss: {3:.7f}".format(
                 epoch + 1, train_steps, train_loss, vali_loss))
@@ -234,13 +233,6 @@ class Exp_Long_Term_Forecast(Exp_Basic):
             #     print("Early stopping")
             #     break
             torch.save(self.model.state_dict(), path + '/' + f'checkpoint_{epoch + 1}.pth')
-
-            # adjust_learning_rate(model_optim, epoch + 1, self.args)
-
-            # get_cka(self.args, setting, self.model, train_loader, self.device, epoch)
-
-        # best_model_path = path + '/' + 'checkpoint.pth'
-        # self.model.load_state_dict(torch.load(best_model_path))
 
         return self.model
     

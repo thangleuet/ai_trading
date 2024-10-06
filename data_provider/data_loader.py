@@ -12,7 +12,7 @@ warnings.filterwarnings('ignore')
 class Dataset_Custom(Dataset):
     def __init__(self, df_raw, size=None,
                  features='S',
-                 target='OT', scale=False, timeenc=1, freq='h'):
+                 target='OT', scale=True, timeenc=1, freq='h'):
         # size [seq_len, label_len, pred_len]
         # info
         if size == None:
