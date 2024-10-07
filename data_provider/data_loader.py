@@ -12,7 +12,7 @@ warnings.filterwarnings('ignore')
 class Dataset_Custom(Dataset):
     def __init__(self, df_raw, size=None,
                  features='S',
-                 target='OT', scale=True, timeenc=1, freq='h'):
+                 target='OT', scale=False, timeenc=1, freq='h'):
         # size [seq_len, label_len, pred_len]
         # info
         if size == None:
@@ -41,7 +41,8 @@ class Dataset_Custom(Dataset):
         df_raw.columns: ['date', ...(other features), target feature]
         '''
         cols = list(self.df_raw.columns)
-        cols = ['Open', 'High', 'Low','volume', 'Close']
+        # cols = ['Open', 'High', 'Low','volume', 'Close']
+        cols = ["ema25", "ema34", "ema89", "ema50", "ema200", "ema7"]
         self.df_raw = self.df_raw[['Date'] + cols]
        
         cols_data = self.df_raw.columns[1:]

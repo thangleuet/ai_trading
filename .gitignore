@@ -36,3 +36,5 @@ figures
 figs
 models
 val
+train_h1
+test_h1
