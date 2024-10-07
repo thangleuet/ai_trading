@@ -250,8 +250,8 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         df = df_raw_test[(df_raw_test['Date'].dt.year == 2023) & (df_raw_test['Date'].dt.month >= 6) & (df_raw_test['Date'].dt.month <= 12)]
         # df = df_raw_test[(df_raw_test['Date'].dt.year == 2024) & (df_raw_test['Date'].dt.month == 1)]
         # df_raw = df_raw_test[['Open', 'High', 'Low', 'volume', 'Close', 'technical_info']]
-        self.data = df[['Open', 'High', 'Low', 'volume', 'Close']].values
-        self.date_time_2023 = df['Date'].values
+        self.data = df_raw_test[['Open', 'High', 'Low', 'volume', 'Close']].values
+        self.date_time_2023 = df_raw_test['Date'].values
         list_mae = []
         total_sl = 0
         total_tp = 0
